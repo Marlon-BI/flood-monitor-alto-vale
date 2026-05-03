@@ -34,3 +34,6 @@ Tratamento dos dados
 Supabase PostgreSQL
         ↓
 Base histórica própria
+
+--comando para rodar o coleta_rio: python -m src.coleta.executar_coleta_automatica
+--comando para rodar o coleta_previsao_chuva: python -m src.coleta.coletar_previsao_chuva
