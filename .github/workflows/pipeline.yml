@@ -27,4 +27,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          python -m src.coleta.executar_pipeline_once
+          python -m src.coleta.executar_pipeline_completos
