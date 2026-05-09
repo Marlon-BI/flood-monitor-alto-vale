@@ -25,6 +25,7 @@ def executar_pipeline():
     executar_etapa("Coletando boletins Defesa Civil SC", "src.coleta.coletar_defesa_civil_sc")
     executar_etapa("Salvando snapshot da previsão", "src.coleta.salvar_snapshot_previsao")
     executar_etapa("Salvando aprendizado hidrológico", "src.coleta.salvar_aprendizado_hidrologico")
+    executar_etapa("Atualizando aprendizado hidrológico", "src.coleta.atualizar_aprendizado_hidrologico")
 
     print("\nPipeline finalizado.")
 
