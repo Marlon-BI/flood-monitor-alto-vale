@@ -23,6 +23,7 @@ def executar_pipeline():
     executar_etapa("Coletando chuva real Defesa Civil Rio do Sul", "src.coleta.coletar_chuva_real_defesa_civil_rio_sul")
     executar_etapa("Coletando previsão de chuva", "src.coleta.coletar_previsao_chuva")
     executar_etapa("Coletando barragens", "src.coleta.coletar_barragens")
+    executar_etapa("Coletando barragens Defesa Civil Rio do Sul", "src.coleta.coletar_barragens_defesa_civil_rio_sul")
     executar_etapa("Coletando boletins Defesa Civil SC", "src.coleta.coletar_defesa_civil_sc")
     executar_etapa("Salvando snapshot da previsão", "src.coleta.salvar_snapshot_previsao")
     executar_etapa("Salvando aprendizado hidrológico", "src.coleta.salvar_aprendizado_hidrologico")
