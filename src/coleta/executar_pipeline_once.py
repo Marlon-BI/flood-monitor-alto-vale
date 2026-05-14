@@ -20,6 +20,7 @@ def executar_pipeline():
     print("Iniciando pipeline completo...")
 
     executar_etapa("Coletando nível do rio", "src.coleta.salvar_rio")
+    executar_etapa("Coletando chuva real Defesa Civil Rio do Sul", "src.coleta.coletar_chuva_real_defesa_civil_rio_sul")
     executar_etapa("Coletando previsão de chuva", "src.coleta.coletar_previsao_chuva")
     executar_etapa("Coletando barragens", "src.coleta.coletar_barragens")
     executar_etapa("Coletando boletins Defesa Civil SC", "src.coleta.coletar_defesa_civil_sc")
