@@ -5,7 +5,7 @@ from datetime import datetime
 from src.database.conexao import get_connection
 
 
-URL = "https://defesacivil.riodosul.sc.gov.br/index.php?r=externo%2Fmetragem"
+URL = "https://defesacivil.riodosul.sc.gov.br/index.php?r=externo%2Fmetragem-sensores"
 FONTE = "Defesa Civil Rio do Sul"
 CIDADE = "Rio do Sul"
 ESTACAO = "Sensor Ponte Dom Tito Buss"
