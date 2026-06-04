@@ -1,160 +1,82 @@
 # Flood Monitor Alto Vale
 
-## 1. Objetivo da POC
+## 1. Visão Geral do Projeto
 
-Criar uma base histórica própria para monitoramento do nível do rio em Rio do Sul/SC e região do Alto Vale do Itajaí.
+O Flood Monitor Alto Vale é uma plataforma experimental de monitoramento hidrológico em tempo real voltada para Rio do Sul/SC e região do Alto Vale do Itajaí.
 
-A ideia inicial é coletar, armazenar e analisar dados reais de nível do rio e chuva observada. Em uma segunda etapa, o projeto deverá cruzar esses dados com previsões meteorológicas em milímetros de chuva nas cidades que influenciam a bacia hidrográfica da região.
+O projeto tem como objetivo construir uma base histórica própria e um modelo inteligente de análise hidrológica utilizando:
 
-## 2. Motivação
+- nível do rio;
+- chuva observada;
+- previsão meteorológica;
+- comportamento das barragens;
+- velocidade de subida/descida;
+- aprendizado baseado em histórico;
+- contexto climático regional.
 
-Rio do Sul e outras cidades do Alto Vale e Vale do Itajaí sofrem historicamente com enchentes. A proposta desta POC é iniciar uma base própria de dados a partir de hoje, sem depender inicialmente de histórico antigo.
+A proposta é evoluir gradualmente de um monitoramento operacional para um sistema de apoio à prevenção de enchentes e análise de risco hidrológico.
 
-Com o tempo, essa base poderá apoiar análises como:
+---
 
-- comportamento do nível do rio;
-- velocidade de subida ou descida;
-- impacto da chuva local;
-- impacto da chuva em cidades a montante;
-- criação de alertas;
-- projeções simples de nível futuro;
-- evolução futura para modelos estatísticos ou IA.
+# 2. Objetivos do Projeto
 
-## 3. Arquitetura atual
+## Objetivos atuais
 
-Fluxo implementado até o momento:
+- Coletar dados em tempo real.
+- Construir base histórica própria.
+- Monitorar tendência do rio.
+- Gerar projeções hidrológicas futuras.
+- Consolidar múltiplas fontes de dados.
+- Disponibilizar dashboard público responsivo.
+
+## Objetivos futuros
+
+- Machine Learning hidrológico avançado.
+- Sistema de alertas personalizados.
+- Cadastro por endereço/CEP.
+- Alertas via WhatsApp e e-mail.
+- Painel administrativo.
+- APIs públicas.
+- Integração com Defesa Civil.
+- Monetização via patrocinadores.
+
+---
+
+# 3. Motivação
+
+Rio do Sul e diversas cidades do Alto Vale sofrem historicamente com enchentes severas.
+
+Embora existam sistemas públicos de monitoramento, muitos dados permanecem descentralizados ou pouco acessíveis à população.
+
+O projeto busca centralizar e transformar esses dados em uma plataforma:
+
+- acessível;
+- visual;
+- automatizada;
+- histórica;
+- inteligente;
+- escalável.
+
+---
+
+# 4. Arquitetura Atual
+
+## Fluxo completo
 
 ```text
-Site Defesa Civil Rio do Sul
+Defesa Civil
+Open-Meteo
+APIs hidrológicas
+Boletins meteorológicos
         ↓
-Python - coleta dos dados
-        ↓
-Tratamento dos dados
-        ↓
-Supabase PostgreSQL
-        ↓
-Base histórica própria
-
---comando para rodar o coleta_rio: python -m src.coleta.executar_coleta_automatica
---comando para rodar o coleta_previsao_chuva: python -m src.coleta.coletar_previsao_chuva
-
-4. Evolução da Arquitetura (Versão Atual)
-
-A arquitetura evoluiu de uma coleta manual para um pipeline automatizado em nuvem.
-
-🔄 Fluxo atual completo
-
-APIs externas (Defesa Civil + Open-Meteo + outras fontes)
-        ↓
-Python (coleta de dados)
+Python (coletores automatizados)
         ↓
 Tratamento e padronização
         ↓
-Supabase PostgreSQL (armazenamento)
+Supabase PostgreSQL
         ↓
-Views SQL (camada analítica)
+Views analíticas SQL
         ↓
-Snapshot de previsões (histórico para avaliação)
+Modelo hidrológico
         ↓
-GitHub Actions (execução automática)
-
-5. Coletas implementadas
-🌊 Nível do rio
-Fonte: Defesa Civil
-Frequência: a cada execução do pipeline
-Armazenamento: tabela histórica
-🌧️ Previsão de chuva
-Fonte: Open-Meteo + simulação adicional (multi-fonte)
-Dados: chuva por hora (mm)
-Cobertura: cidades da bacia hidrográfica
-🏗️ Barragens
-Fonte: API via GraphQL
-Dados:
-capacidade atual
-capacidade máxima
-nível percentual
-montante/jusante
-🚨 Defesa Civil (boletins)
-Fonte: API WordPress
-Objetivo: enriquecer contexto de eventos
-6. Camada analítica (SQL)
-
-Foram criadas views para facilitar análise:
-
-📊 vw_previsao_enchente
-Junta:
-nível atual do rio
-chuva prevista
-status das barragens
-Calcula:
-risco (NORMAL, etc)
-maior cheia histórica
-📊 vw_previsao_enchente_resumo
-Consolida:
-maior percentual de barragens
-status resumido
-risco geral
-📊 vw_previsao_nivel_rio
-Primeira lógica de previsão:
-nível atual
-chuva prevista
-subida estimada
-nível futuro estimado
-7. Snapshot de previsões (fundamental para ML)
-
-Foi implementada a tabela:
-snapshots_previsao_rio
-
-Objetivo:
-
-Registrar cada previsão gerada ao longo do tempo.
-
-Por que isso é importante:
-
-Permite futuramente calcular:
-
-erro da previsão
-melhoria contínua
-ajuste de modelos
-
-👉 Isso é base de Machine Learning real (aprendizado com histórico)
-
-8. Automação do pipeline
-🔁 Execução automática via GitHub Actions
-
-Arquivo:
-
-.github/workflows/pipeline.yml
-Configuração:
-schedule:
-  - cron: "*/30 * * * *"
-
-👉 Significa:
-Execução a cada 30 minutos
-
-⚙️ Execução do pipeline
-
-Script utilizado:
-
-python -m src.coleta.executar_pipeline_once
-
-Esse script executa:
-
-Coleta nível do rio
-Coleta previsão de chuva
-Coleta barragens
-Coleta Defesa Civil
-Salva snapshot da previsão
-9. Banco de dados
-Plataforma: Supabase (PostgreSQL)
-Conexão via:
-DATABASE_URL (GitHub Secrets)
-SSL obrigatório
-10. Status atual do projeto
-
-✅ Pipeline automatizado na nuvem
-✅ Execução sem dependência de máquina local
-✅ Base histórica sendo construída
-✅ Primeira lógica de previsão implementada
-✅ Snapshot para avaliação futura
-⚙️ Estrutura pronta para ML
+Dashboard público (Lovable)

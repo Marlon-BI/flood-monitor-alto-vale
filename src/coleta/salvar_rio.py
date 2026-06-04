@@ -13,7 +13,7 @@ def salvar_dados():
     for d in dados:
         cursor.execute(
             """
-            INSERT INTO leituras_rio (
+            INSERT INTO hidro_leituras_rio (
                 data_hora,
                 nivel_metros,
                 variacao,

@@ -63,7 +63,7 @@ def salvar_boletins(boletins):
     for b in boletins:
         try:
             cursor.execute("""
-                INSERT INTO boletins_defesa_civil_sc (
+                INSERT INTO cmd_boletins_defesa_civil (
                     titulo,
                     url,
                     data_publicacao,

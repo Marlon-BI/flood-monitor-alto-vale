@@ -133,7 +133,7 @@ def salvar_dados(linhas):
 
     for item in linhas:
         cursor.execute("""
-            INSERT INTO chuva_real_defesa_civil_rio_sul (
+            INSERT INTO hidro_chuva_defesa_civil (
                 data_hora,
                 cidade,
                 estacao,

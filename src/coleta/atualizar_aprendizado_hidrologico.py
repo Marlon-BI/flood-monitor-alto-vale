@@ -5,7 +5,7 @@ from src.database.conexao import get_connection
 def buscar_nivel_proximo(cursor, data_referencia):
     cursor.execute("""
         SELECT nivel_metros
-        FROM leituras_rio
+        FROM hidro_leituras_rio
         WHERE data_hora >= %s
         ORDER BY data_hora ASC
         LIMIT 1;
@@ -23,7 +23,7 @@ def atualizar_aprendizado():
         SELECT
             id,
             data_hora_snapshot
-        FROM historico_aprendizado_hidrologico
+        FROM hidro_historico_aprendizado
         WHERE
             nivel_rio_6h_depois IS NULL
             OR nivel_rio_12h_depois IS NULL
@@ -46,7 +46,7 @@ def atualizar_aprendizado():
         nivel_24h = buscar_nivel_proximo(cursor, data_24h)
 
         cursor.execute("""
-            UPDATE historico_aprendizado_hidrologico
+            UPDATE hidro_historico_aprendizado
             SET
                 nivel_rio_6h_depois = COALESCE(nivel_rio_6h_depois, %s),
                 nivel_rio_12h_depois = COALESCE(nivel_rio_12h_depois, %s),

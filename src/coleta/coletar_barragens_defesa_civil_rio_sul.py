@@ -9,9 +9,12 @@ URL = "https://defesacivil.riodosul.sc.gov.br/index.php?r=externo%2Fmetragem"
 FONTE = "Defesa Civil Rio do Sul"
 
 
+# Índice da tabela HTML -> cadastro normalizado da barragem
+# 1 = Barragem Sul / Ituporanga
+# 2 = Barragem Oeste / Taió
 MAPA_BARRAGENS = {
-    1: {"barragem": "Barragem Sul", "cidade": "Ituporanga"},
-    2: {"barragem": "Barragem Oeste", "cidade": "Taió"},
+    1: {"barragem_id": 1, "barragem": "Barragem Sul", "cidade": "Ituporanga"},
+    2: {"barragem_id": 2, "barragem": "Barragem Oeste", "cidade": "Taió"},
 }
 
 
@@ -101,6 +104,7 @@ def extrair_barragens():
 
             registros.append({
                 "data_hora": data_hora,
+                "barragem_id": config["barragem_id"],
                 "barragem": config["barragem"],
                 "cidade": config["cidade"],
                 "montante_m": converter_numero(colunas[1]),
@@ -109,8 +113,8 @@ def extrair_barragens():
                 "comportas_abertas": converter_inteiro(colunas[4]),
                 "comportas_fechadas": converter_inteiro(colunas[5]),
                 "extravasor_m": converter_numero(colunas[6]),
-                "indicador_pluviometrico_mm": converter_numero(colunas[7]),
-                "tempo_status": colunas[8],
+                "chuva_mm": converter_numero(colunas[7]),
+                "tempo": colunas[8],
             })
 
     return registros
@@ -124,43 +128,41 @@ def salvar_registros(registros):
 
     for item in registros:
         cursor.execute("""
-            INSERT INTO barragens_defesa_civil_rio_sul (
+            INSERT INTO hidro_leituras_barragens (
+                barragem_id,
                 data_hora,
-                barragem,
-                cidade,
                 montante_m,
                 diferenca_m,
                 jusante_m,
                 comportas_abertas,
                 comportas_fechadas,
                 extravasor_m,
-                indicador_pluviometrico_mm,
-                tempo_status,
+                chuva_mm,
+                tempo,
                 fonte
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (data_hora, barragem, cidade, fonte) DO UPDATE SET
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (barragem_id, data_hora, fonte) DO UPDATE SET
                 montante_m = EXCLUDED.montante_m,
                 diferenca_m = EXCLUDED.diferenca_m,
                 jusante_m = EXCLUDED.jusante_m,
                 comportas_abertas = EXCLUDED.comportas_abertas,
                 comportas_fechadas = EXCLUDED.comportas_fechadas,
                 extravasor_m = EXCLUDED.extravasor_m,
-                indicador_pluviometrico_mm = EXCLUDED.indicador_pluviometrico_mm,
-                tempo_status = EXCLUDED.tempo_status,
+                chuva_mm = EXCLUDED.chuva_mm,
+                tempo = EXCLUDED.tempo,
                 coletado_em = NOW();
         """, (
+            item["barragem_id"],
             item["data_hora"],
-            item["barragem"],
-            item["cidade"],
             item["montante_m"],
             item["diferenca_m"],
             item["jusante_m"],
             item["comportas_abertas"],
             item["comportas_fechadas"],
             item["extravasor_m"],
-            item["indicador_pluviometrico_mm"],
-            item["tempo_status"],
+            item["chuva_mm"],
+            item["tempo"],
             FONTE,
         ))
 

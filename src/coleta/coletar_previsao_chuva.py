@@ -15,7 +15,7 @@ def buscar_cidades_ativas():
 
     cursor.execute("""
         SELECT id, cidade, latitude, longitude
-        FROM cidades_bacia
+        FROM geo_cidades_bacia
         WHERE ativo = TRUE
         ORDER BY cidade;
     """)
@@ -54,7 +54,7 @@ def inserir_previsoes(cursor, cidade_id, cidade, horarios, chuvas, fonte):
         data_hora = datetime.fromisoformat(horario)
 
         cursor.execute("""
-            INSERT INTO previsao_chuva (
+            INSERT INTO hidro_previsao_chuva (
                 cidade_id,
                 cidade,
                 data_hora_previsao,

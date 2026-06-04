@@ -9,7 +9,7 @@ def buscar_tendencia_hidrologica(cursor):
             horario_pico,
             intensidade_prevista,
             tendencia_rio
-        FROM vw_tendencia_hidrologica
+        FROM app_hidro_tendencia
         LIMIT 1;
     """)
 
@@ -21,7 +21,7 @@ def buscar_ultimo_nivel_rio(cursor):
         SELECT
             data_hora,
             nivel_metros
-        FROM leituras_rio
+        FROM hidro_leituras_rio
         ORDER BY data_hora DESC
         LIMIT 1;
     """)
@@ -38,7 +38,7 @@ def salvar_aprendizado():
         nivel_rio = buscar_ultimo_nivel_rio(cursor)
 
         if not tendencia:
-            print("Nenhum dado encontrado em vw_tendencia_hidrologica.")
+            print("Nenhum dado encontrado em app_hidro_tendencia.")
             return
 
         if not nivel_rio:
@@ -49,7 +49,7 @@ def salvar_aprendizado():
         data_hora_nivel, nivel_metros = nivel_rio
 
         cursor.execute("""
-            INSERT INTO historico_aprendizado_hidrologico (
+            INSERT INTO hidro_historico_aprendizado (
                 data_hora_snapshot,
                 horario_pico_previsto,
                 pico_impacto_mm,
