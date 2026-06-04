@@ -1,64 +1,178 @@
 import requests
+from datetime import datetime
 from src.database.conexao import get_connection
 
-
 URL_GRAPHQL = "https://monitoramento.defesacivil.sc.gov.br/graphql"
+FONTE = "Defesa Civil SC GraphQL"
 
 BARRAGENS = {
-    "DCSC-00042": "Barragem Norte",
-    "DCSC-00040": "Barragem Oeste",
-    "DCSC-00038": "Barragem Sul",
+    "DCSC-00042": {
+        "nome": "Barragem Norte",
+        "cidade": "José Boiteux",
+        "barragem_id": 3,
+    },
+    "DCSC-00040": {
+        "nome": "Barragem Oeste",
+        "cidade": "Taió",
+        "barragem_id": 2,
+    },
+    "DCSC-00038": {
+        "nome": "Barragem Sul",
+        "cidade": "Ituporanga",
+        "barragem_id": 1,
+    },
 }
 
+QUERY = """
+query Tags_data {
+  tags_data(clients: ["secretaria-de-defesa-civil"]) {
+    qualle_meteorologia {
+      codigo
+      timestamp
+      data {
+        barramento {
+          nivel {
+            percentual { value }
+            montante { value }
+            jusante { value }
+            vertido { value }
+          }
+          capacidade {
+            atual { value }
+            maxima { value }
+          }
+        }
+      }
+    }
+  }
+}
+"""
 
-def get_valor(estacao, chave):
-    return estacao.get(f"Data/Barramento/{chave}/Value")
+
+def pegar(dicionario, *chaves):
+    atual = dicionario
+
+    for chave in chaves:
+        if atual is None:
+            return None
+
+        atual = atual.get(chave)
+
+    return atual
+
+
+def pegar_value(dicionario, *chaves):
+    return pegar(dicionario, *chaves, "value")
+
+
+def converter_data_hora(valor):
+    if not valor:
+        return None
+
+    try:
+        return datetime.fromisoformat(
+            valor.replace("Z", "+00:00")
+        )
+    except Exception:
+        return None
 
 
 def coletar_barragens():
-    query = """
-    {
-      estacao_getEstacao
-    }
-    """
 
-    response = requests.post(URL_GRAPHQL, json={"query": query}, timeout=60)
+    response = requests.post(
+        URL_GRAPHQL,
+        json={"query": QUERY},
+        headers={"Content-Type": "application/json"},
+        timeout=60,
+    )
+
     response.raise_for_status()
 
-    data = response.json()["data"]["estacao_getEstacao"]
+    payload = response.json()
 
-    dados = []
+    if payload.get("errors"):
+        print(payload["errors"])
+        return []
 
-    for codigo, nome in BARRAGENS.items():
-        estacao = data.get(codigo)
+    estacoes = (
+        payload
+        .get("data", {})
+        .get("tags_data", {})
+        .get("qualle_meteorologia", [])
+    )
 
-        if not estacao:
-            print(f"Barragem não encontrada na API: {codigo}")
+    registros = []
+
+    for estacao in estacoes:
+
+        codigo = estacao.get("codigo")
+
+        if codigo not in BARRAGENS:
             continue
 
-        dados.append({
+        barramento = pegar(
+            estacao,
+            "data",
+            "barramento"
+        )
+
+        if not barramento:
+            continue
+
+        cfg = BARRAGENS[codigo]
+
+        registros.append({
+            "barragem_id": cfg["barragem_id"],
             "codigo_estacao": codigo,
-            "nome": nome,
-            "capacidade_atual_hm3": get_valor(estacao, "BarramentoCapacidadeAtual"),
-            "capacidade_maxima_hm3": get_valor(estacao, "BarramentoCapacidadeMaxima"),
-            "montante_m": get_valor(estacao, "BarramentoNivelMontante"),
-            "jusante_m": get_valor(estacao, "BarramentoNivelJusante"),
-            "nivel_percentual": get_valor(estacao, "BarramentoNivelPercentual"),
-            "nivel_vertido_m": get_valor(estacao, "BarramentoNivelVertido"),
+            "data_hora": converter_data_hora(
+                estacao.get("timestamp")
+            ),
+            "capacidade_atual_hm3": pegar_value(
+                barramento,
+                "capacidade",
+                "atual"
+            ),
+            "capacidade_maxima_hm3": pegar_value(
+                barramento,
+                "capacidade",
+                "maxima"
+            ),
+            "montante_m": pegar_value(
+                barramento,
+                "nivel",
+                "montante"
+            ),
+            "jusante_m": pegar_value(
+                barramento,
+                "nivel",
+                "jusante"
+            ),
+            "nivel_percentual": pegar_value(
+                barramento,
+                "nivel",
+                "percentual"
+            ),
+            "nivel_vertido_m": pegar_value(
+                barramento,
+                "nivel",
+                "vertido"
+            ),
         })
 
-    return dados
+    return registros
 
 
-def salvar_barragens(dados):
+def salvar_barragens(registros):
+
     conn = get_connection()
     cursor = conn.cursor()
 
-    inseridos = 0
+    total = 0
 
-    for d in dados:
+    for r in registros:
+
         cursor.execute("""
-            INSERT INTO leituras_barragens (
+            INSERT INTO hidro_leituras_barragens (
                 barragem_id,
                 codigo_estacao,
                 data_hora,
@@ -70,45 +184,52 @@ def salvar_barragens(dados):
                 nivel_vertido_m,
                 fonte
             )
-            SELECT
-                id,
-                %s,
-                NOW(),
-                %s,
-                %s,
-                %s,
-                %s,
-                %s,
-                %s,
-                'Defesa Civil SC GraphQL'
-            FROM barragens
-            WHERE nome = %s
-            ON CONFLICT (barragem_id, data_hora, fonte) DO NOTHING;
+            VALUES (
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,%s
+            )
+            ON CONFLICT (
+                barragem_id,
+                data_hora,
+                fonte
+            )
+            DO UPDATE SET
+                codigo_estacao = EXCLUDED.codigo_estacao,
+                capacidade_atual_hm3 = EXCLUDED.capacidade_atual_hm3,
+                capacidade_maxima_hm3 = EXCLUDED.capacidade_maxima_hm3,
+                montante_m = EXCLUDED.montante_m,
+                jusante_m = EXCLUDED.jusante_m,
+                nivel_percentual = EXCLUDED.nivel_percentual,
+                nivel_vertido_m = EXCLUDED.nivel_vertido_m;
         """, (
-            d["codigo_estacao"],
-            d["capacidade_atual_hm3"],
-            d["capacidade_maxima_hm3"],
-            d["montante_m"],
-            d["jusante_m"],
-            d["nivel_percentual"],
-            d["nivel_vertido_m"],
-            d["nome"],
+            r["barragem_id"],
+            r["codigo_estacao"],
+            r["data_hora"],
+            r["capacidade_atual_hm3"],
+            r["capacidade_maxima_hm3"],
+            r["montante_m"],
+            r["jusante_m"],
+            r["nivel_percentual"],
+            r["nivel_vertido_m"],
+            FONTE
         ))
 
-        inseridos += cursor.rowcount
+        total += cursor.rowcount
 
     conn.commit()
+
     cursor.close()
     conn.close()
 
-    print(f"Registros inseridos: {inseridos}")
+    print(f"Registros salvos/atualizados: {total}")
 
 
 if __name__ == "__main__":
+
     print("Coletando dados reais das barragens...")
+
     dados = coletar_barragens()
 
-    for d in dados:
-        print(d)
+    for item in dados:
+        print(item)
 
     salvar_barragens(dados)
