@@ -7,6 +7,7 @@ from src.database.conexao import get_connection
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 TIMEOUT_SEGUNDOS = 90
 PAUSA_ENTRE_CIDADES_SEGUNDOS = 2
+FONTE = "Open-Meteo"
 
 
 def buscar_cidades_ativas():
@@ -14,10 +15,16 @@ def buscar_cidades_ativas():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id, cidade, latitude, longitude
-        FROM geo_cidades_bacia
-        WHERE ativo = TRUE
-        ORDER BY cidade;
+        SELECT
+            id,
+            cidade,
+            latitude,
+            longitude,
+            bacia,
+            peso_hidrologico
+        FROM cmd_cidades_monitoradas
+        WHERE ativa = TRUE
+        ORDER BY ordem_coleta;
     """)
 
     cidades = cursor.fetchall()
@@ -63,6 +70,7 @@ def inserir_previsoes(cursor, cidade_id, cidade, horarios, chuvas, fonte):
             )
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (cidade, data_hora_previsao, fonte) DO UPDATE SET
+                cidade_id = EXCLUDED.cidade_id,
                 chuva_prevista_mm = EXCLUDED.chuva_prevista_mm,
                 coletado_em = NOW();
         """, (
@@ -85,8 +93,13 @@ def salvar_previsao_chuva():
     cidades_sucesso = 0
     cidades_falha = 0
 
-    for cidade_id, cidade, latitude, longitude in cidades:
-        print(f"Coletando previsão para {cidade}...")
+    print(f"Cidades ativas para previsão: {len(cidades)}")
+
+    for cidade_id, cidade, latitude, longitude, bacia, peso_hidrologico in cidades:
+        print(
+            f"Coletando previsão para {cidade} "
+            f"(bacia={bacia}, peso={peso_hidrologico})..."
+        )
 
         try:
             dados = coletar_previsao_open_meteo(latitude, longitude)
@@ -103,7 +116,7 @@ def salvar_previsao_chuva():
                 cidade=cidade,
                 horarios=horarios,
                 chuvas=chuvas,
-                fonte="Open-Meteo",
+                fonte=FONTE,
             )
 
             conn.commit()
