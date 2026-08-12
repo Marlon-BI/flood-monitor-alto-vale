@@ -1,7 +1,7 @@
 name: Flood Monitor Pipeline - Heavy
 
 # TEMPORARY RUNNER — NON CANONICAL
-# Canonical source: Inlift-Tecnologia/sentinel@5c2730ce094ff25ea1c67141bd0f07f090c4f1cf
+# Canonical source: Inlift-Tecnologia/sentinel@b7b4f36d5e756fd8154ef98b07f6f787814ef030
 #
 # Este workflow existe apenas porque o GitHub Actions do repositório
 # canônico (Inlift-Tecnologia/sentinel) está temporariamente bloqueado por
