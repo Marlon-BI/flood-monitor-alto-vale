@@ -1,137 +1,35 @@
-import re
-import requests
-from bs4 import BeautifulSoup
-from datetime import datetime
+import contextlib
+
 from src.database.conexao import get_connection
+from src.coleta.asthon import cliente, modelos
 
-
-URL = "https://defesacivil.riodosul.sc.gov.br/index.php?r=externo%2Fmetragem-sensores"
 FONTE = "Defesa Civil Rio do Sul"
 CIDADE = "Rio do Sul"
 ESTACAO = "Sensor Ponte Dom Tito Buss"
+STATION_ID_DOM_TITO_BUSS = "f6360951-219f-4859-935f-b2e2d13962f1"
 
 
-def converter_numero(valor):
-    if valor is None:
+def coletar_leitura():
+    payload = cliente.buscar_panel()
+    estacao_panel = modelos.extrair_estacao_painel(payload, STATION_ID_DOM_TITO_BUSS)
+
+    if estacao_panel is None:
         return None
 
-    texto = str(valor).strip()
-
-    if texto in ("", "-", "NULL", "null", "None"):
-        return None
-
-    texto = texto.replace(",", ".")
-    texto = re.sub(r"[^0-9\.\-]", "", texto)
-
-    if texto == "":
-        return None
-
-    try:
-        return float(texto)
-    except ValueError:
-        return None
+    return modelos.normalizar_leitura_chuva_defesa_civil(estacao_panel)
 
 
-def converter_data_hora(valor):
-    texto = str(valor).strip()
+def salvar_dados(leitura):
+    if leitura is None:
+        return 0
 
-    formatos = [
-        "%d/%m/%Y %H:%M",
-        "%d/%m/%Y %HH",
-        "%d/%m %HH",
-        "%d/%m %H:%M",
-    ]
-
-    for formato in formatos:
-        try:
-            data = datetime.strptime(texto, formato)
-
-            if "%Y" not in formato:
-                data = data.replace(year=datetime.now().year)
-
-            return data
-        except ValueError:
-            continue
-
-    return None
-
-
-def buscar_tabela_defesa_civil():
-    response = requests.get(URL, timeout=60)
-    response.raise_for_status()
-
-    soup = BeautifulSoup(response.text, "html.parser")
-
-    tabelas = soup.find_all("table")
-
-    for tabela in tabelas:
-        texto = tabela.get_text(" ", strip=True)
-
-        if "Taxa Chuva" in texto or "Chuva Acum" in texto or "Ind.Pluv" in texto:
-            return tabela
-
-    raise RuntimeError("Tabela de chuva/nível não encontrada na página da Defesa Civil.")
-
-
-def extrair_linhas():
-    tabela = buscar_tabela_defesa_civil()
-    linhas_extraidas = []
-
-    linhas = tabela.find_all("tr")
-
-    for linha in linhas:
-        colunas = [c.get_text(" ", strip=True) for c in linha.find_all(["td", "th"])]
-
-        if len(colunas) < 5:
-            continue
-
-        if "Data" in colunas[0] or "Nível" in " ".join(colunas):
-            continue
-
-        # Tela completa:
-        # Data | Nível | Diferença | Taxa Chuva (mm/h) | Chuva Acum. Dia (mm) | Temp (°C)
-        # Tela lateral:
-        # Data Hora | Nível | Diferença | Ind.Pluv. | Tempo
-        data_hora = converter_data_hora(colunas[0])
-        if not data_hora:
-            continue
-
-        nivel_metros = converter_numero(colunas[1]) if len(colunas) > 1 else None
-        diferenca_m = converter_numero(colunas[2]) if len(colunas) > 2 else None
-
-        taxa_chuva_mm_h = None
-        chuva_acumulada_dia_mm = None
-        temperatura_c = None
-        tempo_status = None
-
-        if len(colunas) >= 6:
-            taxa_chuva_mm_h = converter_numero(colunas[3])
-            chuva_acumulada_dia_mm = converter_numero(colunas[4])
-            temperatura_c = converter_numero(colunas[5])
-        elif len(colunas) >= 5:
-            taxa_chuva_mm_h = converter_numero(colunas[3])
-            tempo_status = colunas[4]
-
-        linhas_extraidas.append({
-            "data_hora": data_hora,
-            "nivel_metros": nivel_metros,
-            "diferenca_m": diferenca_m,
-            "taxa_chuva_mm_h": taxa_chuva_mm_h,
-            "chuva_acumulada_dia_mm": chuva_acumulada_dia_mm,
-            "temperatura_c": temperatura_c,
-            "tempo_status": tempo_status,
-        })
-
-    return linhas_extraidas
-
-
-def salvar_dados(linhas):
     conn = get_connection()
-    cursor = conn.cursor()
-
+    cursor = None
     inseridos = 0
 
-    for item in linhas:
+    try:
+        cursor = conn.cursor()
+
         cursor.execute("""
             INSERT INTO hidro_chuva_defesa_civil (
                 data_hora,
@@ -148,46 +46,68 @@ def salvar_dados(linhas):
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (data_hora, cidade, estacao, fonte) DO UPDATE SET
                 nivel_metros = EXCLUDED.nivel_metros,
-                diferenca_m = EXCLUDED.diferenca_m,
-                taxa_chuva_mm_h = EXCLUDED.taxa_chuva_mm_h,
-                chuva_acumulada_dia_mm = EXCLUDED.chuva_acumulada_dia_mm,
-                temperatura_c = EXCLUDED.temperatura_c,
-                tempo_status = EXCLUDED.tempo_status,
-                coletado_em = NOW();
+                diferenca_m = COALESCE(
+                    EXCLUDED.diferenca_m,
+                    hidro_chuva_defesa_civil.diferenca_m
+                ),
+                taxa_chuva_mm_h = COALESCE(
+                    EXCLUDED.taxa_chuva_mm_h,
+                    hidro_chuva_defesa_civil.taxa_chuva_mm_h
+                ),
+                chuva_acumulada_dia_mm = COALESCE(
+                    EXCLUDED.chuva_acumulada_dia_mm,
+                    hidro_chuva_defesa_civil.chuva_acumulada_dia_mm
+                ),
+                temperatura_c = COALESCE(
+                    EXCLUDED.temperatura_c,
+                    hidro_chuva_defesa_civil.temperatura_c
+                ),
+                tempo_status = COALESCE(
+                    EXCLUDED.tempo_status,
+                    hidro_chuva_defesa_civil.tempo_status
+                ),
+                coletado_em = NOW()
+            WHERE hidro_chuva_defesa_civil.nivel_metros IS DISTINCT FROM EXCLUDED.nivel_metros;
         """, (
-            item["data_hora"],
+            leitura.data_hora,
             CIDADE,
             ESTACAO,
-            item["nivel_metros"],
-            item["diferenca_m"],
-            item["taxa_chuva_mm_h"],
-            item["chuva_acumulada_dia_mm"],
-            item["temperatura_c"],
-            item["tempo_status"],
+            leitura.nivel_metros,
+            leitura.diferenca_m,
+            leitura.taxa_chuva_mm_h,
+            leitura.chuva_acumulada_dia_mm,
+            leitura.temperatura_c,
+            leitura.tempo_status,
             FONTE,
         ))
 
-        inseridos += cursor.rowcount
-
-    conn.commit()
-    cursor.close()
-    conn.close()
+        inseridos = cursor.rowcount
+        conn.commit()
+    except Exception:
+        with contextlib.suppress(Exception):
+            conn.rollback()
+        raise
+    finally:
+        if cursor is not None:
+            with contextlib.suppress(Exception):
+                cursor.close()
+        with contextlib.suppress(Exception):
+            conn.close()
 
     return inseridos
 
 
 def main():
-    print("Coletando chuva real da Defesa Civil de Rio do Sul...")
+    print("Coletando nível real (Asthon) da Ponte Dom Tito Buss para hidro_chuva_defesa_civil...")
 
-    linhas = extrair_linhas()
+    leitura = coletar_leitura()
 
-    if not linhas:
-        print("Nenhuma linha encontrada.")
+    if leitura is None:
+        print("Estação Dom Tito Buss não encontrada no payload da Asthon.")
         return
 
-    inseridos = salvar_dados(linhas)
+    inseridos = salvar_dados(leitura)
 
-    print(f"Linhas extraídas: {len(linhas)}")
     print(f"Registros salvos/atualizados: {inseridos}")
 
 

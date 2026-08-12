@@ -1,0 +1,49 @@
+name: Flood Monitor Pipeline - Critical
+
+# TEMPORARY RUNNER — NON CANONICAL
+# Canonical source: Inlift-Tecnologia/sentinel@5c2730ce094ff25ea1c67141bd0f07f090c4f1cf
+#
+# Este workflow existe apenas porque o GitHub Actions do repositório
+# canônico (Inlift-Tecnologia/sentinel) está temporariamente bloqueado por
+# billing. Assim que o bloqueio for resolvido, a execução volta a rodar no
+# repositório oficial e este workflow deve ser desativado.
+#
+# Roda 1x por hora. UTC == America/Sao_Paulo em cadência horária, então não
+# há conversão de fuso a fazer aqui (ver pipeline-heavy.yml para os horários
+# convertidos).
+#
+# Só RIO e CHUVA_REAL_DC (via API Asthon) e BARRAGENS (leve, GraphQL Defesa
+# Civil SC). Etapas pesadas (Open-Meteo, EPAGRI/CIRAM, aprendizado,
+# validações, snapshots, boletins) rodam em pipeline-heavy.yml.
+#
+# RIO e CHUVA_REAL_DC são etapas críticas: se qualquer uma falhar, o job
+# termina com exit code != 0 e o Action fica FAILURE.
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run-pipeline-critical:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-critical.txt
+
+      - name: Run critical pipeline (RIO, CHUVA_REAL_DC, BARRAGENS)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python -m src.coleta.executar_pipeline_critico

@@ -1,8 +1,15 @@
-name: Flood Monitor Pipeline
+name: Flood Monitor Pipeline (legacy, manual only)
+
+# TEMPORARY RUNNER — NON CANONICAL
+# Canonical source: Inlift-Tecnologia/sentinel@5c2730ce094ff25ea1c67141bd0f07f090c4f1cf
+#
+# Schedule removido nesta mesma entrega que ativa pipeline-critical.yml e
+# pipeline-heavy.yml, para evitar dual writer (dois pipelines diferentes
+# escrevendo nas mesmas tabelas ao mesmo tempo). Este workflow usa o
+# pipeline monolítico legado (scraping HTML da Defesa Civil, sem Asthon) e
+# fica disponível apenas via workflow_dispatch para referência/debug.
 
 on:
-  schedule:
-    - cron: "0 * * * *"
   workflow_dispatch:
 
 jobs:

@@ -1,36 +1,25 @@
-import subprocess
+"""Executa o pipeline completo (crítico + pesado) em uma única chamada.
+
+Uso: workflow_dispatch manual/agregador. Os pipelines em produção rodam
+separados — ver executar_pipeline_critico.py (1x/h) e
+executar_pipeline_pesado.py (6x/dia).
+"""
+
 import sys
-from datetime import datetime
+
+from src.coleta.executar_pipeline_critico import ETAPAS as ETAPAS_CRITICAS
+from src.coleta.executar_pipeline_pesado import ETAPAS as ETAPAS_PESADAS
+from src.coleta.orquestrador import executar_etapas
 
 
-def executar_etapa(nome, modulo):
-    print(f"\n[{datetime.now()}] {nome}...")
+def main() -> int:
+    _, exit_critico = executar_etapas("PIPELINE CRÍTICO", ETAPAS_CRITICAS)
+    _, exit_pesado = executar_etapas("PIPELINE PESADO", ETAPAS_PESADAS)
 
-    resultado = subprocess.run(
-        [sys.executable, "-m", modulo],
-        check=False,
-    )
+    print("\nPipeline completo finalizado.")
 
-    if resultado.returncode != 0:
-        print(f"Falha na etapa '{nome}': Erro ao executar módulo: {modulo}")
-        print("Continuando para a próxima etapa...")
-
-
-def executar_pipeline():
-    print("Iniciando pipeline completo...")
-
-    executar_etapa("Coletando nível do rio", "src.coleta.salvar_rio")
-    executar_etapa("Coletando chuva real Defesa Civil Rio do Sul", "src.coleta.coletar_chuva_real_defesa_civil_rio_sul")
-    executar_etapa("Coletando previsão de chuva", "src.coleta.coletar_previsao_chuva")
-    executar_etapa("Coletando barragens", "src.coleta.coletar_barragens")
-    executar_etapa("Coletando barragens Defesa Civil Rio do Sul", "src.coleta.coletar_barragens_defesa_civil_rio_sul")
-    executar_etapa("Coletando boletins Defesa Civil SC", "src.coleta.coletar_defesa_civil_sc")
-    executar_etapa("Salvando snapshot da previsão", "src.coleta.salvar_snapshot_previsao")
-    executar_etapa("Salvando aprendizado hidrológico", "src.coleta.salvar_aprendizado_hidrologico")
-    executar_etapa("Atualizando aprendizado hidrológico", "src.coleta.atualizar_aprendizado_hidrologico")
-
-    print("\nPipeline finalizado.")
+    return exit_critico or exit_pesado
 
 
 if __name__ == "__main__":
-    executar_pipeline()
+    sys.exit(main())
