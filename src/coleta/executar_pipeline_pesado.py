@@ -28,11 +28,6 @@ ETAPAS = [
         "src.coleta.validar_previsoes_hidrologicas",
         critica=False,
     ),
-    Etapa(
-        "APRENDIZADO_ATUALIZAR",
-        "src.coleta.atualizar_aprendizado_hidrologico",
-        critica=False,
-    ),
 ]
 
 
