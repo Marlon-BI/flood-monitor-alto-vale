@@ -1,0 +1,60 @@
+name: Flood Monitor Pipeline - Heavy
+
+# TEMPORARY RUNNER — NON CANONICAL
+# Canonical source: Inlift-Tecnologia/sentinel@5c2730ce094ff25ea1c67141bd0f07f090c4f1cf
+#
+# Este workflow existe apenas porque o GitHub Actions do repositório
+# canônico (Inlift-Tecnologia/sentinel) está temporariamente bloqueado por
+# billing. Assim que o bloqueio for resolvido, a execução volta a rodar no
+# repositório oficial e este workflow deve ser desativado.
+#
+# Roda 6x por dia, nos horários abaixo (America/Sao_Paulo é UTC-3 o ano
+# inteiro — Brasil não tem mais horário de verão desde 2019):
+#
+#   America/Sao_Paulo -> UTC
+#   00:00              -> 03:00
+#   04:00              -> 07:00
+#   08:00              -> 11:00
+#   12:00              -> 15:00
+#   16:00              -> 19:00
+#   20:00              -> 23:00
+#
+# Contém as etapas não críticas e mais pesadas: previsão de chuva
+# (Open-Meteo), chuva observada/previsão EPAGRI-CIRAM, barragens Defesa
+# Civil, boletins, snapshot de previsão, aprendizado hidrológico e
+# validação de previsões. Nenhuma etapa aqui é crítica — falha pontual não
+# derruba o job (ver src/coleta/executar_pipeline_pesado.py).
+
+on:
+  schedule:
+    - cron: "0 3,7,11,15,19,23 * * *"
+  workflow_dispatch:
+
+jobs:
+  run-pipeline-heavy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tesseract-ocr tesseract-ocr-por
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run heavy pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python -m src.coleta.executar_pipeline_pesado

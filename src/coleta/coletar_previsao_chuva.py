@@ -1,12 +1,13 @@
-import time
-import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+
+import requests
 from src.database.conexao import get_connection
 
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
-TIMEOUT_SEGUNDOS = 90
-PAUSA_ENTRE_CIDADES_SEGUNDOS = 2
+TIMEOUT_SEGUNDOS = 20
+MAX_WORKERS = 5
 FONTE = "Open-Meteo"
 
 
@@ -86,6 +87,12 @@ def inserir_previsoes(cursor, cidade_id, cidade, horarios, chuvas, fonte):
     return inseridos
 
 
+def _buscar_previsao_cidade(cidade_info):
+    cidade_id, cidade, latitude, longitude, bacia, peso_hidrologico = cidade_info
+    dados = coletar_previsao_open_meteo(latitude, longitude)
+    return cidade_id, cidade, dados
+
+
 def salvar_previsao_chuva():
     cidades = buscar_cidades_ativas()
 
@@ -95,50 +102,62 @@ def salvar_previsao_chuva():
 
     print(f"Cidades ativas para previsão: {len(cidades)}")
 
-    for cidade_id, cidade, latitude, longitude, bacia, peso_hidrologico in cidades:
-        print(
-            f"Coletando previsão para {cidade} "
-            f"(bacia={bacia}, peso={peso_hidrologico})..."
-        )
+    resultados_por_cidade = {}
 
-        try:
-            dados = coletar_previsao_open_meteo(latitude, longitude)
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futuros = {
+            executor.submit(_buscar_previsao_cidade, cidade_info): cidade_info
+            for cidade_info in cidades
+        }
 
-            horarios = dados["hourly"]["time"]
-            chuvas = dados["hourly"]["precipitation"]
+        for futuro in as_completed(futuros):
+            cidade_id, cidade, _, _, bacia, peso_hidrologico = futuros[futuro]
 
-            conn = get_connection()
-            cursor = conn.cursor()
+            try:
+                _, _, dados = futuro.result()
+                resultados_por_cidade[cidade_id] = (cidade, dados)
+                print(f"Previsão obtida para {cidade} (bacia={bacia}, peso={peso_hidrologico}).")
 
-            processados = inserir_previsoes(
-                cursor=cursor,
-                cidade_id=cidade_id,
-                cidade=cidade,
-                horarios=horarios,
-                chuvas=chuvas,
-                fonte=FONTE,
-            )
+            except requests.exceptions.RequestException as e:
+                cidades_falha += 1
+                print(f"Erro de rede/API ao coletar previsão para {cidade}: {e}")
 
-            conn.commit()
-            cursor.close()
-            conn.close()
+            except Exception as e:
+                cidades_falha += 1
+                print(f"Erro inesperado ao coletar previsão para {cidade}: {e}")
 
-            cidades_sucesso += 1
-            total_processados += processados
+    if resultados_por_cidade:
+        conn = get_connection()
+        cursor = conn.cursor()
 
-            print(f"{cidade}: {processados} previsões salvas/atualizadas.")
+        for cidade_id, (cidade, dados) in resultados_por_cidade.items():
+            try:
+                horarios = dados["hourly"]["time"]
+                chuvas = dados["hourly"]["precipitation"]
 
-        except requests.exceptions.RequestException as e:
-            cidades_falha += 1
-            print(f"Erro de rede/API ao coletar previsão para {cidade}: {e}")
-            print("Pulando esta cidade e continuando...")
+                processados = inserir_previsoes(
+                    cursor=cursor,
+                    cidade_id=cidade_id,
+                    cidade=cidade,
+                    horarios=horarios,
+                    chuvas=chuvas,
+                    fonte=FONTE,
+                )
 
-        except Exception as e:
-            cidades_falha += 1
-            print(f"Erro inesperado ao processar {cidade}: {e}")
-            print("Pulando esta cidade e continuando...")
+                conn.commit()
 
-        time.sleep(PAUSA_ENTRE_CIDADES_SEGUNDOS)
+                cidades_sucesso += 1
+                total_processados += processados
+
+                print(f"{cidade}: {processados} previsões salvas/atualizadas.")
+
+            except Exception as e:
+                cidades_falha += 1
+                conn.rollback()
+                print(f"Erro ao salvar previsão para {cidade}: {e}")
+
+        cursor.close()
+        conn.close()
 
     print("Processo finalizado.")
     print(f"Cidades com sucesso: {cidades_sucesso}")
