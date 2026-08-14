@@ -13,6 +13,19 @@ class TestPipelineCritico(unittest.TestCase):
         barragens = next(e for e in executar_pipeline_critico.ETAPAS if e.nome == "BARRAGENS")
         self.assertFalse(barragens.critica)
 
+    def test_barragem_taio_e_ituporanga_presentes_e_nao_criticas_por_enquanto(self):
+        nomes_criticos = {e.nome for e in executar_pipeline_critico.ETAPAS if e.critica}
+        taio = next(e for e in executar_pipeline_critico.ETAPAS if e.nome == "BARRAGEM_TAIO")
+        ituporanga = next(e for e in executar_pipeline_critico.ETAPAS if e.nome == "BARRAGEM_ITUPORANGA")
+
+        self.assertEqual(taio.modulo, "src.coleta.salvar_barragem_taio")
+        self.assertEqual(ituporanga.modulo, "src.coleta.salvar_barragem_ituporanga")
+        self.assertFalse(taio.critica)
+        self.assertFalse(ituporanga.critica)
+        # fontes de barragem nunca devem tornar o critico FAILURE por enquanto
+        self.assertNotIn("BARRAGEM_TAIO", nomes_criticos)
+        self.assertNotIn("BARRAGEM_ITUPORANGA", nomes_criticos)
+
     def test_nao_contem_etapas_pesadas(self):
         nomes = {e.nome for e in executar_pipeline_critico.ETAPAS}
         self.assertNotIn("PREVISAO_CHUVA", nomes)
@@ -49,6 +62,20 @@ class TestPipelinePesado(unittest.TestCase):
         nomes = {e.nome for e in executar_pipeline_pesado.ETAPAS}
         self.assertNotIn("RIO", nomes)
         self.assertNotIn("CHUVA_REAL_DC", nomes)
+
+    def test_nao_contem_barragem_taio_nem_ituporanga_duplicadas(self):
+        # BARRAGEM_TAIO/BARRAGEM_ITUPORANGA rodam no critico (1x/h) — nao
+        # devem rodar duplicadas aqui.
+        #
+        # NOTA (runner temporário, sync mínimo): este repo não sincroniza
+        # executar_pipeline_pesado.py — só o caminho crítico (ver
+        # docs/COMPORTAS_RESTAURACAO_2026-08.md no repo canônico). A etapa
+        # BARRAGENS_DC (fonte morta) continua presente aqui até o pesado
+        # também ser sincronizado; por isso não checamos a ausência dela
+        # neste teste, ao contrário do repo canônico.
+        nomes = {e.nome for e in executar_pipeline_pesado.ETAPAS}
+        self.assertNotIn("BARRAGEM_TAIO", nomes)
+        self.assertNotIn("BARRAGEM_ITUPORANGA", nomes)
 
     @patch("src.coleta.orquestrador.subprocess.run")
     def test_main_retorna_0_mesmo_com_falha_nao_critica(self, mock_run):
