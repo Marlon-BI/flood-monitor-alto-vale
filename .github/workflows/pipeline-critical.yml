@@ -1,7 +1,7 @@
 name: Flood Monitor Pipeline - Critical
 
 # TEMPORARY RUNNER — NON CANONICAL
-# Canonical source: Inlift-Tecnologia/sentinel@b7b4f36d5e756fd8154ef98b07f6f787814ef030
+# Canonical source: Inlift-Tecnologia/sentinel@a006b6c348d8667a7bfa80a769a2aeddd0fb30ad (main)
 #
 # Este workflow existe apenas porque o GitHub Actions do repositório
 # canônico (Inlift-Tecnologia/sentinel) está temporariamente bloqueado por
@@ -12,12 +12,18 @@ name: Flood Monitor Pipeline - Critical
 # há conversão de fuso a fazer aqui (ver pipeline-heavy.yml para os horários
 # convertidos).
 #
-# Só RIO e CHUVA_REAL_DC (via API Asthon) e BARRAGENS (leve, GraphQL Defesa
-# Civil SC). Etapas pesadas (Open-Meteo, EPAGRI/CIRAM, aprendizado,
-# validações, snapshots, boletins) rodam em pipeline-heavy.yml.
+# RIO e CHUVA_REAL_DC (via API Asthon), BARRAGENS (leve, GraphQL Defesa
+# Civil SC) e BARRAGEM_TAIO/BARRAGEM_ITUPORANGA (fontes municipais de
+# comportas — a fonte antiga, Defesa Civil de Rio do Sul, parou de
+# atualizar em 27/07/2026; ver docs/COMPORTAS_RESTAURACAO_2026-08.md no
+# repositório canônico). Etapas pesadas (Open-Meteo, EPAGRI/CIRAM,
+# aprendizado, validações, snapshots, boletins) rodam em
+# pipeline-heavy.yml.
 #
 # RIO e CHUVA_REAL_DC são etapas críticas: se qualquer uma falhar, o job
-# termina com exit code != 0 e o Action fica FAILURE.
+# termina com exit code != 0 e o Action fica FAILURE. BARRAGEM_TAIO e
+# BARRAGEM_ITUPORANGA ainda não são críticas — fontes novas em
+# estabilização.
 
 on:
   schedule:
@@ -42,7 +48,7 @@ jobs:
         run: |
           pip install -r requirements-critical.txt
 
-      - name: Run critical pipeline (RIO, CHUVA_REAL_DC, BARRAGENS)
+      - name: Run critical pipeline (RIO, CHUVA_REAL_DC, BARRAGENS, BARRAGEM_TAIO, BARRAGEM_ITUPORANGA)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |

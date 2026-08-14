@@ -219,4 +219,4 @@ __marimo__/
 
 .env
 venv/
-__pycache__/
+__pycache__/.venv_runner_test/

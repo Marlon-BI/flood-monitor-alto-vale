@@ -1,8 +1,12 @@
-# Dependências mínimas do pipeline crítico (RIO, CHUVA_REAL_DC, BARRAGENS).
+# Dependências mínimas do pipeline crítico (RIO, CHUVA_REAL_DC, BARRAGENS,
+# BARRAGEM_TAIO, BARRAGEM_ITUPORANGA).
 # Roda 1x/hora — mantido enxuto de propósito para reduzir o tempo de
 # "pip install" e o consumo de minutos do GitHub Actions.
-# Não inclui pandas/numpy/SQLAlchemy/beautifulsoup4/lxml/pillow/pytesseract,
-# usados apenas pelo pipeline pesado.
+# Não inclui pandas/numpy/SQLAlchemy/lxml/pillow/pytesseract, usados
+# apenas pelo pipeline pesado. beautifulsoup4 É necessário aqui: o coletor
+# da Barragem Sul (Ituporanga) faz parsing de HTML (não há API JSON para
+# essa fonte — ver docs/COMPORTAS_RESTAURACAO_2026-08.md).
+beautifulsoup4==4.14.3
 psycopg2-binary==2.9.12
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
